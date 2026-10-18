@@ -1,0 +1,21 @@
+{
+  "general": {
+    "concurrency": 20,
+    "timeout": 10,
+    "last_names_file": "data/input/names_to_check.txt"
+  },
+  "proxies": {
+    "proxy_mode": "static",
+    "remove_proxies": true,
+    "last_proxy_file": "data/input/proxies.txt"
+  },
+  "tokens": {
+    "use_tokens": true
+  },
+  "notifications": {
+    "webhook": ""
+  },
+  "advanced": {
+    "third_party_api_url": ""
+  }
+}
