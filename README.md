@@ -1,6 +1,6 @@
 # Discord Username Finder
 
-Công cụ check username Discord tốc độ cao, chạy async thuần, giao diện ANSI thuần (không cần rich) và không bắt buộc token Discord.
+High-speed Discord username checker featuring pure asynchronous execution, a pure ANSI interface (no Rich dependency required), and no mandatory Discord token.
 
 ![version](https://img.shields.io/badge/version-3.1.0-0A84FF)
 ![Python 3.9+](https://img.shields.io/badge/Python-3.9%2B-3776AB?logo=python&logoColor=white)
@@ -12,7 +12,7 @@ Công cụ check username Discord tốc độ cao, chạy async thuần, giao di
 
 ## Demo
 
-Mô phỏng khối live card khi đang chạy (lấy theo `live_card()` trong `src/ui.py`, giao diện ANSI thuần, không vẽ khung box):
+Simulation of the live card view during runtime (derived from `live_card()` in `src/ui.py`, pure ANSI interface with borderless styling):
 
 ```text
   Discord Username Finder v3.1  ● RUNNING  00:04:12
@@ -38,47 +38,47 @@ Mô phỏng khối live card khi đang chạy (lấy theo `live_card()` trong `s
 
 ---
 
-## Tính năng
+## Features
 
-- **Đa luồng async**: hàng trăm đến hàng nghìn worker cùng lúc, hard cap `MAX_CONCURRENCY = 2000` (`src/config.py`) để asyncio/aiohttp không stall; worker stagger khi khởi động tránh dội request đồng loạt.
-- **Proxy linh hoạt**: bể static xoay vòng bằng deque với pacing (giãn cách tối thiểu mỗi lần cấp phát), bể free/scraped chấm điểm `score_hit` (+5, cap 100) / `score_miss` (-1, score <= 0 thì loại) theo weighted random; per-proxy cooldown, park khi 429, hồi sinh proxy soft-dead.
-- **Token Pool xoay vòng**: `TokenPool` lấy token kế tiếp theo round-robin, bỏ qua token dead và token đang cooldown; cooldown 429 theo `retry_after` (clamp 0.5 đến 1800s), đánh dấu dead khi 401/403; hết token sống thì tự chuyển sang chế độ unauthed (hybrid) thay vì dừng.
-- **Double-check chống hit ảo**: hit `AVAILABLE` được xác nhận lại bằng proxy thứ hai và đối chiếu chéo API (`token` `pomelo-attempt` với `unauthed` `username-attempt-unauthed`) khi có thể; nếu vẫn còn mờ thì chuyển sang third-party API fallback (`third_party_api_url`).
-- **Webhook Discord theo lố**: `WebhookSender` tích lũy hit rồi flush theo batch (mỗi 15 tên / 1950 ký tự / 3 giây), có backoff, drain queue cuối phiên và ghi phần gửi lỗi ra `webhook_failed.txt` (at-least-once).
-- **Circuit breaker**: mở mạch khi quá nhiều lỗi liên tiếp (threshold 10 trong cửa sổ 2s, cooldown 2s) để mọi worker nghỉ ngắn, tránh thundering herd trên proxy đang chết.
-- **Lưu progress an toàn khi Ctrl+C**: `finally` gọi `_finalize_flush()` ghi `hits.txt` và giữ lại tên chưa xong trong `data/input/names_to_check.txt`; tên đã xử lý xong tự được gỡ khỏi file nên lần chạy sau chỉ còn đúng phần chưa làm (không sinh file `checked.tsv`).
-- **Giao diện ANSI thuần**: không phụ thuộc rich; hiển thị Progress, Available Hits, Taken / Invalid, Total Requests, Speed (req/s và checks/s), Rate Limited, Circuit Breaks, Errors theo loại, Recent Hits và feed hoạt động gần nhất.
-- **Header giả lập trình duyệt**: tự cào `client_build_number` từ Discord web client để làm mới `X-Super-Properties`, kèm SSL context theo thứ tự cipher của Chrome.
-
----
-
-## Cảnh báo & An toàn
-
-- Tool gọi endpoint đăng ký username của Discord. Dùng kèm **tài khoản/token thật** có thể vi phạm Điều khoản dịch vụ của Discord (risk lock, captcha, ban). Hãy dùng cho mục đích nghiên cứu và test.
-- Proxy free/public không ổn định và có thể ghi log lưu lượng của bạn. Không dùng dữ liệu nhạy cảm sau lưng proxy không tin cậy.
-- Repo đã kèm `.gitignore` chặn `config.json`, `data/input/tokens*.txt`, `data/input/proxies.txt`, `data/input/names_to_check.txt` và `data/output/*` để không commit nhầm bí mật. Vẫn nên kiểm tra `git status` trước khi commit.
-- Nhóm hỗ trợ không chịu trách nhiệm cho cách bạn sử dụng công cụ này.
+- **Async Multi-Worker Architecture**: Scales from hundreds to thousands of concurrent workers with a hard limit of `MAX_CONCURRENCY = 2000` (`src/config.py`) to prevent asyncio/aiohttp event loop starvation; worker startup staggering avoids sudden request bursts.
+- **Flexible Proxy Management**: Rotates static proxy pools using a deque with pacing (minimum interval per allocation); scores free/scraped proxy pools with `score_hit` (+5, capped at 100) and `score_miss` (-1, evicted when score <= 0) via weighted random selection; supports per-proxy cooldowns, 429 parking, and soft-dead proxy revival.
+- **Rotating Token Pool**: `TokenPool` selects tokens via round-robin, bypassing dead tokens and those currently on cooldown; clamps 429 cooldowns based on `retry_after` (between 0.5s and 1800s); marks tokens dead on 401/403 responses; automatically degrades to unauthenticated (hybrid) mode instead of crashing when all tokens are exhausted.
+- **Double-Check False-Positive Mitigation**: Every `AVAILABLE` hit is cross-verified using a secondary proxy and alternative API endpoints (`token` `pomelo-attempt` vs. `unauthed` `username-attempt-unauthed`) whenever possible; falls back to an external third-party lookup API (`third_party_api_url`) if ambiguity persists.
+- **Batched Discord Webhook Delivery**: `WebhookSender` queues hits and dispatches them in batches (every 15 names / 1,950 characters / 3 seconds) with exponential backoff; drains pending queues on exit and logs delivery errors to `webhook_failed.txt` for an at-least-once guarantee.
+- **Circuit Breaker Pattern**: Opens the circuit breaker when error spikes occur (threshold of 10 consecutive failures within a 2-second window, 2-second cooldown) to briefly pause workers and prevent cascading failures on degraded proxies.
+- **Safe Progress Persistence on Ctrl+C**: The `finally` handler invokes `_finalize_flush()` to write hits to `hits.txt` and retain unverified names in `data/input/names_to_check.txt`; completed names are pruned directly from the input file so resuming only processes remaining work (no auxiliary `checked.tsv` needed).
+- **Pure ANSI Terminal UI**: Zero third-party terminal styling dependencies; dynamically displays progress, available hits, taken/invalid tallies, total requests, throughput metrics (req/s and checks/s), rate limits, circuit breaks, categorized errors, recent hits, and live event logs.
+- **Browser Signature Emulation**: Dynamically parses `client_build_number` from the Discord web client to refresh `X-Super-Properties`, combined with custom SSL ciphers matching modern Chrome releases.
 
 ---
 
-## Cài đặt & Quick start
+## Warnings & Disclaimer
 
-**Yêu cầu**: Python 3.9 trở lên.
+- This tool sends requests to Discord username registration endpoints. Using this tool with **real accounts or personal tokens** carries the risk of Terms of Service violations (including account locks, CAPTCHA challenges, or permanent suspensions). Use strictly for research and testing purposes.
+- Free and public proxies are inherently unstable and may log or inspect network traffic. Never route sensitive credentials through unverified public proxies.
+- The repository includes a `.gitignore` configured to exclude `config.json`, `data/input/tokens*.txt`, `data/input/proxies.txt`, `data/input/names_to_check.txt`, and `data/output/*` to prevent unintentional credential leaks. Always verify `git status` prior to pushing commits.
+- The authors and maintainers accept no liability for any misuse or damages resulting from the use of this software.
+
+---
+
+## Installation & Quick Start
+
+**Requirements**: Python 3.9 or higher.
 
 ```bash
-# Tải repo về (Download ZIP hoặc git clone với URL GitHub của bạn)
+# Clone the repository (or download ZIP)
 cd DiscordUsernameChecker-main
 pip install -r requirements.txt
 ```
 
-`requirements.txt` gồm 2 thư viện:
+`requirements.txt` dependencies:
 
 ```text
 aiohttp>=3.9.0
 curl_cffi>=0.7.0
 ```
 
-**Cấu hình `config.json`** (tự tạo `{}` nếu thiếu, nằm ở project root). File được **phân nhóm theo mục** cho rõ ràng; code đọc theo tên key phẳng nên bố cục đổi không ảnh hưởng logic:
+**Configuring `config.json`** (automatically generated as `{}` if missing, located at project root). Settings are **grouped into sections** for clarity; the application parses keys flatly, so formatting adjustments will not affect execution:
 
 ```json
 {
@@ -90,40 +90,40 @@ curl_cffi>=0.7.0
 }
 ```
 
-| Nhóm | Key | Ý nghĩa |
+| Section | Key | Description |
 | --- | --- | --- |
-| `general` | `concurrency`, `timeout` | số worker và timeout (mặc định `--no-wizard`: 50 / 10) |
-| `general` | `last_names_file` | file tên dùng lần trước (path tương đối, tự resolve theo project root) |
-| `proxies` | `proxy_mode` | nguồn proxy lần trước: `scraped` / `static` / `none` |
-| `proxies` | `last_proxy_file` | file proxy dùng lần trước |
-| `proxies` | `remove_proxies` | tự loại proxy chết trong phiên |
-| `tokens` | `use_tokens` | bật chế độ token (đọc `data/input/tokens.txt`) |
-| `notifications` | `webhook` | URL webhook Discord; **để rỗng thì tắt webhook** |
-| `advanced` | `third_party_api_url` | API kiểm tra phụ cho double-check; rỗng thì bỏ qua bước này |
+| `general` | `concurrency`, `timeout` | Worker concurrency limit and network timeout (defaults with `--no-wizard`: 50 / 10) |
+| `general` | `last_names_file` | Target username file path from the previous session (relative to project root) |
+| `proxies` | `proxy_mode` | Proxy pool mode: `scraped` / `static` / `none` |
+| `proxies` | `last_proxy_file` | Proxy file path used in the previous run |
+| `proxies` | `remove_proxies` | Automatically evicts unresponsive proxies during the run |
+| `tokens` | `use_tokens` | Enables token-authenticated checks (reads `data/input/tokens.txt`) |
+| `notifications` | `webhook` | Discord incoming webhook URL; **leave empty to disable notifications** |
+| `advanced` | `third_party_api_url` | Auxiliary API endpoint for hit double-checks; leave empty to skip |
 
-Path file được lưu **tương đối** theo project root (không lộ đường dẫn tuyệt đối của máy bạn). Các cờ nâng cao cũ (`auto_scrape_build`, `use_fingerprint`, `reuse_proxies`) đã gỡ khỏi file — hành vi mặc định vẫn giữ nguyên.
+File paths are stored **relative** to the project root directory (preventing exposure of local system paths). Legacy flags (`auto_scrape_build`, `use_fingerprint`, `reuse_proxies`) have been removed from the file while preserving default behavior.
 
-**Các lệnh chạy thật** (xem `main.py` và `parse_args()` trong `src/checker.py`):
+**CLI Commands** (see `main.py` and `parse_args()` in `src/checker.py`):
 
 ```bash
-python main.py                 # mặc định: chạy setup wizard tương tác
-python main.py --no-wizard     # bỏ qua wizard, dùng config.json + file đã lưu
-python main.py -n              # tương đương --no-wizard
-python main.py -d              # bật debug log request/response (--debug)
-python main.py --version       # in phiên bản rồi thoát
+python main.py                 # Default: Launches interactive setup wizard
+python main.py --no-wizard     # Bypasses wizard, reads config.json and saved file paths
+python main.py -n              # Alias for --no-wizard
+python main.py -d              # Enables verbose request/response debugging (--debug)
+python main.py --version       # Displays current version and exits
 ```
 
-Chỉ có 3 flag: `-d/--debug`, `-n/--no-wizard`, `--version`.
+Available flags: `-d/--debug`, `-n/--no-wizard`, `--version`.
 
-**File input** (đảm bảo tồn tại, tool tự tạo nếu thiếu):
+**Input Files** (automatically created with boilerplate if missing):
 
 ```text
-data/input/proxies.txt           # mỗi dòng một proxy
-data/input/names_to_check.txt    # mỗi dòng một username cần check
-data/input/tokens.txt            # mỗi dòng một token (chỉ cần khi use_tokens = true)
+data/input/proxies.txt           # One proxy per line
+data/input/names_to_check.txt    # One username per line
+data/input/tokens.txt            # One token per line (required only if use_tokens = true)
 ```
 
-Định dạng proxy được chấp nhận:
+Supported proxy formats:
 
 ```text
 host:port
@@ -132,79 +132,79 @@ host:port:user:pass
 http://host:port
 ```
 
-(Không hỗ trợ `socks4://`, `socks5://`.)
+(`socks4://` and `socks5://` protocols are not supported.)
 
 ---
 
-## Cấu trúc thư mục & luồng xử lý
+## Directory Structure & Flowchart
 
 ```text
 DiscordUsernameChecker-main/
-|-- main.py                  # entry point mỏng, gọi src.checker.main()
-|-- config.json              # cấu hình lưu trữ (webhook, concurrency, ...)
+|-- main.py                  # Lightweight entry point, calls src.checker.main()
+|-- config.json              # Configuration file (webhook, concurrency, etc.)
 |-- requirements.txt         # aiohttp>=3.9.0, curl_cffi>=0.7.0
-|-- .gitignore               # chan secrets (config, tokens, proxies) khoi git
-|-- LICENSE                  # giay phep MIT
+|-- .gitignore               # Ignores sensitive data (config, tokens, proxies)
+|-- LICENSE                  # MIT License
 |-- README.md
 |-- src/
 |   |-- __init__.py
-|   |-- checker.py           # CLI argparse, wizard hook, workers, writer hits
-|   |-- config.py            # VERSION 3.1.0, DEFAULT_*, MAX_CONCURRENCY, Config JSON
+|   |-- checker.py           # CLI parsing, wizard integration, worker loop, hit writer
+|   |-- config.py            # VERSION 3.1.0, DEFAULT_*, MAX_CONCURRENCY, Config JSON handler
 |   |-- engine.py            # Checker engine, CircuitBreaker, WebhookSender, ThirdPartyResolver
-|   |-- http_backend.py      # backend HTTP (aiohttp / curl_cffi), phân loại lỗi
-|   |-- proxy.py             # ProxyManager: rotation, cooldown, scoring, pacing
-|   |-- token_pool.py        # TokenPool: round-robin, cooldown 429, mark_dead
-|   |-- ui.py                # banner, live_card, thanh tiến độ (ANSI thuần)
-|   |-- wizard.py            # setup wizard tương tác
+|   |-- http_backend.py      # HTTP client backend (aiohttp / curl_cffi), error classification
+|   |-- proxy.py             # ProxyManager: rotation, cooldowns, scoring, pacing
+|   |-- token_pool.py        # TokenPool: round-robin, 429 cooldown, mark_dead
+|   |-- ui.py                # ANSI terminal banner, live_card, progress indicators
+|   |-- wizard.py            # Interactive setup CLI wizard
 |-- tests/
 |   |-- conftest.py
-|   |-- test_*.py            # 27 file test, 377 test case
+|   |-- test_*.py            # 27 test files, 377 test cases
 |-- data/
     |-- input/
-    |   |-- .gitkeep           # giu thu muc trong repo (file that duoc gitignore)
+    |   |-- .gitkeep           # Keeps directory in VCS (actual files are gitignored)
     |   |-- proxies.txt
     |   |-- names_to_check.txt
     |   |-- tokens.txt
     |   |-- tokens_dead.txt
     |-- output/
-        |-- .gitkeep           # giu thu muc trong repo
+        |-- .gitkeep           # Keeps directory in VCS
         |-- hits.txt
 ```
 
-Lưu ý: repo hiện không kèm `config.example.json`; `config.json` được tạo tự động dạng `{}` nếu chưa có.
+*Note: The repository does not supply a `config.example.json`; `config.json` is initialized automatically as `{}` if not found.*
 
-Sơ đồ luồng xử lý:
+Execution Flowchart:
 
 ```mermaid
 flowchart TD
     P1["data/input/proxies.txt"] --> WZ
     P2["data/input/names_to_check.txt"] --> WZ
     P3["data/input/tokens.txt"] --> WZ
-    CFG["config.json (nhom general/proxies/tokens/notifications/advanced)"] --> WZ
-    WZ["Setup wizard / --no-wizard"] --> ENG["Checker engine: async workers (toi da 2000)"]
+    CFG["config.json (general/proxies/tokens/notifications/advanced)"] --> WZ
+    WZ["Setup wizard / --no-wizard"] --> ENG["Checker engine: async workers (max 2000)"]
     ENG --> PM["ProxyManager: round-robin + pacing + scoring"]
-    ENG --> TP["TokenPool: round-robin + cooldown 429 + dead 401/403"]
+    ENG --> TP["TokenPool: round-robin + 429 cooldown + 401/403 dead"]
     ENG --> CL{"Classify response"}
-    CL -->|"available"| DBC{"Double-check: proxy thu 2 + chieu API"}
-    CL -->|"taken / invalid"| CNT["dem vao thong ke (khong ghi file)"]
-    CL -->|"429 / error"| CB["cooldown + circuit breaker + backoff"]
-    DBC -->|"xac nhan"| HIT["data/output/hits.txt"]
-    DBC -->|"van con mo"| TP3["Third-party API fallback"]
-    DBC -->|"khong xac nhan"| CNT
-    HIT --> WH["Discord webhook (batch 15 ten)"]
+    CL -->|"available"| DBC{"Double-check: secondary proxy + cross API"}
+    CL -->|"taken / invalid"| CNT["Count in stats (no file write)"]
+    CL -->|"429 / error"| CB["Cooldown + circuit breaker + backoff"]
+    DBC -->|"Confirmed"| HIT["data/output/hits.txt"]
+    DBC -->|"Ambiguous"| TP3["Third-party API fallback"]
+    DBC -->|"Unconfirmed"| CNT
+    HIT --> WH["Discord webhook (batch 15 names)"]
     CB --> ENG
-    ENG --> FIN["_finalize_flush(): hits + ten chua xong ghi vao names_to_check.txt"]
+    ENG --> FIN["_finalize_flush(): hits + remaining names to names_to_check.txt"]
 ```
 
 ---
 
 ## Troubleshooting / FAQ
 
-1. **`curl_cffi` lỗi build / `ImportError` khi cài** - đổi sang backend `aiohttp` (bỏ cài curl_cffi) hoặc dùng Python 3.11 trở lên để có wheel sẵn.
-2. **`No proxies found` / `Không tìm thấy proxy`** - kiểm tra `data/input/proxies.txt`: mỗi dòng đúng `host:port`, `login:pass@host:port` hoặc `host:port:user:pass`; không để JSON lẫn vào, không dùng `socks4://`, `socks5://`.
-3. **Token báo 401/403** - token đã chết; tool chỉ đánh dead trong phiên, bạn chuyển token đó sang `data/input/tokens_dead.txt` rồi chạy lại; nếu hết token sống tool tự chạy unauthed.
-4. **429 hàng loạt** - tool tự cooldown proxy/token và mở circuit breaker; nếu vẫn bị thì giảm `concurrency` trong `config.json`, tăng số proxy hoặc chờ ban Cloudflare (15 đến 30 phút) hết hạn.
-5. **Bấm Ctrl+C giữa chừng** - tiến độ được lưu: hit vào `data/output/hits.txt`, tên chưa check giữ lại trong `data/input/names_to_check.txt`; chạy lại chỉ tốn request cho đúng phần còn lại.
+1. **`curl_cffi` build failures or `ImportError` on install** — Switch to the pure `aiohttp` backend (remove `curl_cffi` from requirements) or run on Python 3.11+ where pre-built wheels are standard.
+2. **`No proxies found` error** — Check `data/input/proxies.txt`: ensure each entry strictly follows `host:port`, `login:pass@host:port`, or `host:port:user:pass`. Avoid JSON formatting or comments; `socks4://` and `socks5://` are not supported.
+3. **Tokens returning 401/403 errors** — The token is invalid or terminated. The engine marks it dead for the current session; move it to `data/input/tokens_dead.txt` before restarting. If all tokens fail, the tool continues in unauthenticated mode automatically.
+4. **Mass 429 Rate Limits** — The tool automatically applies cooldowns to affected proxies/tokens and triggers the circuit breaker. If rate limiting continues, lower `concurrency` in `config.json`, provide a larger proxy list, or wait for the temporary Cloudflare restriction (typically 15–30 minutes) to clear.
+5. **Interrupting with Ctrl+C** — Progress is preserved automatically: discovered hits are committed to `data/output/hits.txt`, and unverified usernames remain in `data/input/names_to_check.txt`. Re-running will process only the remaining queue.
 
 ---
 
