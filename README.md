@@ -211,8 +211,8 @@ flowchart TD
 ## Connect & Support
 
 - Discord: https://discord.gg/rxw8Hwk3qA
-- TikTok: https://www.tiktok.com/@lakofusion
-- YouTube: https://www.youtube.com/@lakofusion2010
+- TikTok: https://www.tiktok.com/@noxofusion
+- YouTube: https://www.youtube.com/@noxofusion2010
 
 ---
 
